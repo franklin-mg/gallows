@@ -1,58 +1,59 @@
-/**
- * Service Worker para Gallows - Tecnotic
- * Gestiona la caché para permitir el funcionamiento offline y mejorar la velocidad.
- */
-
-const CACHE_NAME = 'gallows-cache-v1';
-
-// Lista de activos a cachear durante la instalación
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'letterfall-v1';
+const ASSETS = [
   './',
   './index.html',
+  './the_gallows.html',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  'https://cdn-icons-png.flaticon.com/512/3565/3565507.png'
 ];
 
-// Evento de instalación: guarda los archivos en la caché
-self.addEventListener('install', (event) => {
+// Instalación y almacenamiento en caché
+self.addEventListener('install', event => {
+  console.log('[Service Worker] Estado: Instalando...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Cache abierta: guardando activos estáticos');
-        return cache.addAll(ASSETS_TO_CACHE);
+      .then(cache => {
+        console.log('[Service Worker] Cacheando archivos estáticos...');
+        return cache.addAll(ASSETS);
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[Service Worker] Instalación completada con éxito.');
+        return self.skipWaiting();
+      })
   );
 });
 
-// Evento de activación: limpia cachés antiguas si las hubiera
-self.addEventListener('activate', (event) => {
+// Activación y limpieza de caches antiguos
+self.addEventListener('activate', event => {
+  console.log('[Service Worker] Estado: Activando...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Borrando caché antigua:', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('[Service Worker] Eliminando caché antiguo:', cache);
+            return caches.delete(cache);
           }
         })
       );
+    }).then(() => {
+      console.log('[Service Worker] Ahora está listo para manejar peticiones.');
+      return self.clients.claim();
     })
   );
-  return self.clients.claim();
 });
 
-// Evento fetch: intercepta peticiones para servir desde caché primero
-self.addEventListener('fetch', (event) => {
+// Estrategia Cache First (usar caché y si no hay, ir a red)
+self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then((response) => {
-        // Retorna la respuesta desde caché si existe, de lo contrario busca en la red
-        return response || fetch(event.request);
-      })
-      .catch(() => {
-        // Opcional: podrías retornar una página offline aquí si fuera necesario
+      .then(response => {
+        if (response) {
+          console.log('[Service Worker] Cargando desde caché:', event.request.url);
+          return response;
+        }
+        console.log('[Service Worker] Solicitando a la red:', event.request.url);
+        return fetch(event.request);
       })
   );
 });
